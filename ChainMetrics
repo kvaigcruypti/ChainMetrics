@@ -1,0 +1,86 @@
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+
+class ChainMetrics:
+    def __init__(self, blockchain: str, api_key: str):
+        self.blockchain = blockchain
+        self.api_key = api_key
+        self.api_urls = {
+            'ethereum': 'https://api.etherscan.io/api',
+            'bitcoin': 'https://blockchain.info/rawblock'
+        }
+
+    def get_ethereum_metrics(self) -> dict:
+        url = self.api_urls['ethereum']
+        params = {
+            'module': 'stats',
+            'action': 'dailyavgblocksize',
+            'apikey': self.api_key
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        return data if data['status'] == '1' else {}
+
+    def get_bitcoin_metrics(self, block_height: int) -> dict:
+        url = f"{self.api_urls['bitcoin']}/{block_height}"
+        response = requests.get(url)
+        data = response.json()
+        return data
+
+    def get_ethereum_token_data(self, contract_address: str) -> dict:
+        url = self.api_urls['ethereum']
+        params = {
+            'module': 'token',
+            'action': 'tokeninfo',
+            'contractaddress': contract_address,
+            'apikey': self.api_key
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        return data if data['status'] == '1' else {}
+
+    def plot_blockchain_metrics(self, blockchain: str, metric_data: dict):
+        if blockchain == 'ethereum':
+            df = pd.DataFrame(metric_data['result'])
+            df['date'] = pd.to_datetime(df['date'])
+            df.set_index('date', inplace=True)
+            df['value'].plot(figsize=(12, 6))
+            plt.title('Ethereum Daily Average Block Size')
+            plt.xlabel('Date')
+            plt.ylabel('Block Size (Bytes)')
+            plt.grid(True)
+            plt.show()
+
+        elif blockchain == 'bitcoin':
+            block_data = {
+                'height': metric_data['height'],
+                'size': metric_data['size'],
+                'tx_count': metric_data['tx']
+            }
+            df = pd.DataFrame([block_data])
+            df.plot(kind='bar', x='height', figsize=(12, 6))
+            plt.title('Bitcoin Block Metrics')
+            plt.xlabel('Block Height')
+            plt.ylabel('Metrics')
+            plt.grid(True)
+            plt.show()
+
+# Example Usage
+if __name__ == "__main__":
+    ETH_API_KEY = 'YOUR_ETHERSCAN_API_KEY'
+    BITCOIN_BLOCK_HEIGHT = 700000  # Example block height for Bitcoin
+
+    chain_metrics = ChainMetrics(blockchain='ethereum', api_key=ETH_API_KEY)
+
+    # Fetch and Display Ethereum Metrics
+    eth_metrics = chain_metrics.get_ethereum_metrics()
+    print("Ethereum Metrics:")
+    print(eth_metrics)
+    chain_metrics.plot_blockchain_metrics('ethereum', eth_metrics)
+
+    # Fetch and Display Bitcoin Metrics
+    bitcoin_metrics = chain_metrics.get_bitcoin_metrics(BITCOIN_BLOCK_HEIGHT)
+    print("Bitcoin Metrics:")
+    print(bitcoin_metrics)
+    chain_metrics.plot_blockchain_metrics('bitcoin', bitcoin_metrics)
